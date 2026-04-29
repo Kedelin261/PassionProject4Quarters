@@ -155,4 +155,65 @@ goals.delete('/daily/:id', async (c) => {
   return c.json({ message: 'Deleted' })
 })
 
+goals.get('/pyramid', async (c) => {
+  const userId = c.get('userId')
+  const today = new Date().toISOString().split('T')[0]
+  const nowDate = new Date()
+
+  const cycle = await c.env.DB.prepare(
+    "SELECT * FROM twelve_week_cycles WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1"
+  ).bind(userId).first() as any
+
+  if (!cycle) {
+    return c.json({
+      cycle: null, quarterGoals: [], monthlyGoals: [], weeklyGoals: [], dailyGoals: [], habits: [],
+      metrics: { cycleProgress: 0, monthlyProgress: 0, weeklyProgress: 0, dailyProgress: 0, habitProgress: 0 },
+    })
+  }
+
+  const cycleStart = new Date(cycle.start_date)
+  const monthsElapsed = (nowDate.getFullYear() - cycleStart.getFullYear()) * 12 + (nowDate.getMonth() - cycleStart.getMonth())
+  const currentMonthNumber = Math.min(Math.max(monthsElapsed + 1, 1), 3)
+
+  const [qgRes, mgRes, wgRes, dgRes, habitsRes] = await Promise.all([
+    c.env.DB.prepare('SELECT * FROM twelve_week_goals WHERE user_id = ? AND cycle_id = ? ORDER BY priority').bind(userId, cycle.id).all(),
+    c.env.DB.prepare('SELECT * FROM monthly_goals WHERE user_id = ? AND month_number = ? ORDER BY created_at').bind(userId, currentMonthNumber).all(),
+    c.env.DB.prepare('SELECT * FROM weekly_goals WHERE user_id = ? ORDER BY week_number, created_at').bind(userId).all(),
+    c.env.DB.prepare('SELECT * FROM daily_goals WHERE user_id = ? AND date = ? ORDER BY created_at').bind(userId, today).all(),
+    c.env.DB.prepare(
+      'SELECT h.id, h.name, h.goal_behavior, h.habit_type, he.id as entry_id, he.executed, he.success, he.note ' +
+      'FROM habits h LEFT JOIN habit_entries he ON h.id = he.habit_id AND he.date = ? ' +
+      'WHERE h.user_id = ? AND h.active = 1 ORDER BY h.created_at'
+    ).bind(today, userId).all(),
+  ])
+
+  const quarterGoals = qgRes.results as any[]
+  const qgIds = new Set(quarterGoals.map((g: any) => g.id))
+  const monthlyGoals = (mgRes.results as any[]).filter((mg: any) => qgIds.has(mg.twelve_week_goal_id))
+  const mgIds = new Set(monthlyGoals.map((g: any) => g.id))
+  const weeklyGoals = (wgRes.results as any[]).filter((wg: any) => mgIds.has(wg.monthly_goal_id))
+  const dailyGoals = dgRes.results as any[]
+  const habits = habitsRes.results as any[]
+
+  const pct = (num: number, den: number) => den > 0 ? Math.round((num / den) * 100) : 0
+  const cycleProgress = pct(quarterGoals.filter((g: any) => g.status === 'completed').length, quarterGoals.length)
+  const monthlyProgress = pct(monthlyGoals.filter((g: any) => g.status === 'completed').length, monthlyGoals.length)
+  const weeklyProgress = pct(weeklyGoals.filter((g: any) => g.status === 'completed').length, weeklyGoals.length)
+  const dailyProgress = pct(dailyGoals.filter((g: any) => g.status === 'completed').length, dailyGoals.length)
+  const habitProgress = pct(habits.filter((h: any) => h.success === 1).length, habits.length)
+
+  return c.json({
+    cycle: { ...cycle, progress: cycleProgress },
+    quarterGoals: quarterGoals.map((g: any) => ({
+      ...g,
+      progress: pct(g.current_value, g.target_value || 100),
+    })),
+    monthlyGoals,
+    weeklyGoals,
+    dailyGoals,
+    habits,
+    metrics: { cycleProgress, monthlyProgress, weeklyProgress, dailyProgress, habitProgress },
+  })
+})
+
 export default goals

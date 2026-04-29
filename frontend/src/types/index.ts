@@ -143,6 +143,35 @@ export interface AIConversation {
   updated_at: string
 }
 
+export interface PyramidMetrics {
+  cycleProgress: number
+  monthlyProgress: number
+  weeklyProgress: number
+  dailyProgress: number
+  habitProgress: number
+}
+
+export interface PyramidHabit {
+  id: string
+  name: string
+  goal_behavior: 'execute' | 'avoid'
+  habit_type: string
+  entry_id: string | null
+  executed: number | null
+  success: number | null
+  note: string | null
+}
+
+export interface PyramidData {
+  cycle: (Cycle & { progress: number }) | null
+  quarterGoals: (QuarterGoal & { progress: number })[]
+  monthlyGoals: MonthlyGoal[]
+  weeklyGoals: WeeklyGoal[]
+  dailyGoals: DailyGoal[]
+  habits: PyramidHabit[]
+  metrics: PyramidMetrics
+}
+
 export interface AIMessage {
   id: string
   conversation_id: string

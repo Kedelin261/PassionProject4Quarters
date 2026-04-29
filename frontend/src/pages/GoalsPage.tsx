@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Trash2, Edit2, Target, CheckCircle2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Trash2, Target, LayoutList, Triangle } from 'lucide-react'
 import { api } from '../lib/api'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { ProgressBar } from '../components/ui/ProgressBar'
+import PyramidView from '../components/goals/PyramidView'
 import type { QuarterGoal, MonthlyGoal, WeeklyGoal, DailyGoal, Cycle } from '../types'
+
+type ViewMode = 'list' | 'pyramid'
 
 const STATUS_OPTIONS = ['not_started', 'in_progress', 'blocked', 'completed']
 const DAILY_STATUS = ['planned', 'completed', 'missed', 'blocked']
@@ -143,6 +146,7 @@ function MonthlyGoalRow({ goal, cycleId, onUpdate }: { goal: MonthlyGoal; cycleI
 }
 
 export default function GoalsPage() {
+  const [view, setView] = useState<ViewMode>('list')
   const [goals, setGoals] = useState<QuarterGoal[]>([])
   const [cycles, setCycles] = useState<Cycle[]>([])
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null)
@@ -190,15 +194,43 @@ export default function GoalsPage() {
           <h1 className="text-2xl font-bold text-white">Goals</h1>
           <p className="text-surface-400 text-sm">12-week vision broken into executable daily actions</p>
         </div>
-        <div className="flex gap-3">
-          {!activeCycle && (
-            <Button variant="secondary" onClick={() => setShowAddCycle(true)}>
-              <Plus size={16} /> New Cycle
-            </Button>
+        <div className="flex items-center gap-3">
+          {/* View toggle */}
+          <div className="flex items-center bg-surface-800 border border-surface-700 rounded-lg p-1">
+            <button
+              onClick={() => setView('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                view === 'list'
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'text-surface-400 hover:text-white'
+              }`}
+            >
+              <LayoutList size={13} /> List
+            </button>
+            <button
+              onClick={() => setView('pyramid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                view === 'pyramid'
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'text-surface-400 hover:text-white'
+              }`}
+            >
+              <Triangle size={13} /> Pyramid
+            </button>
+          </div>
+
+          {view === 'list' && (
+            <>
+              {!activeCycle && (
+                <Button variant="secondary" onClick={() => setShowAddCycle(true)}>
+                  <Plus size={16} /> New Cycle
+                </Button>
+              )}
+              <Button onClick={() => setShowAddGoal(true)} disabled={!activeCycle || goals.length >= 3}>
+                <Plus size={16} /> Add 12-Week Goal
+              </Button>
+            </>
           )}
-          <Button onClick={() => setShowAddGoal(true)} disabled={!activeCycle || goals.length >= 3}>
-            <Plus size={16} /> Add 12-Week Goal
-          </Button>
         </div>
       </div>
 
@@ -228,14 +260,20 @@ export default function GoalsPage() {
         </Card>
       )}
 
-      {goals.length === 0 ? (
+      {/* Pyramid View */}
+      {view === 'pyramid' && <PyramidView />}
+
+      {/* List View */}
+      {view === 'list' && goals.length === 0 && (
         <Card className="text-center py-12">
           <Target size={48} className="mx-auto mb-4 text-surface-600" />
           <div className="text-surface-400 text-lg font-medium">No goals yet</div>
           <p className="text-surface-500 text-sm mt-1">Create your first 12-week goal to get started.</p>
           {activeCycle && <Button className="mt-4" onClick={() => setShowAddGoal(true)}>Set First Goal</Button>}
         </Card>
-      ) : (
+      )}
+
+      {view === 'list' && goals.length > 0 && (
         <div className="space-y-4">
           {goals.map((qg) => (
             <Card key={qg.id}>
