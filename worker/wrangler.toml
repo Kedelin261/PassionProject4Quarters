@@ -1,0 +1,12 @@
+name = "four-quarters-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "four-quarters-db"
+database_id = "8a07e12e-fd8c-4675-b95f-c65467162be0"
+
+[vars]
+JWT_SECRET = "fourquarters_cf_secret_2026_change_this"
