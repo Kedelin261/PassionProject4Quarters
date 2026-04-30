@@ -1,28 +1,28 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Eye, Target, CheckSquare, Calendar,
   Users, MessageSquare, Bot, BarChart3, Settings, LogOut,
   Zap
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import HelpMenu from '../onboarding/HelpMenu'
 import clsx from 'clsx'
 
 const nav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/vision', icon: Eye, label: 'Vision' },
-  { to: '/goals', icon: Target, label: 'Goals' },
-  { to: '/habits', icon: CheckSquare, label: 'Habit Tracker' },
-  { to: '/time-blocking', icon: Calendar, label: 'Time Blocking' },
-  { to: '/accountability', icon: Users, label: 'Accountability' },
-  { to: '/standups', icon: MessageSquare, label: 'Standups' },
-  { to: '/ai-coach', icon: Bot, label: 'AI Coach' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard',      tour: 'nav-dashboard' },
+  { to: '/vision',         icon: Eye,             label: 'Vision',          tour: 'nav-vision' },
+  { to: '/goals',          icon: Target,          label: 'Goals',           tour: 'nav-goals' },
+  { to: '/habits',         icon: CheckSquare,     label: 'Habit Tracker',   tour: 'nav-habits' },
+  { to: '/time-blocking',  icon: Calendar,        label: 'Time Blocking',   tour: 'nav-time-blocking' },
+  { to: '/accountability', icon: Users,           label: 'Accountability',  tour: 'nav-accountability' },
+  { to: '/standups',       icon: MessageSquare,   label: 'Standups',        tour: 'nav-standups' },
+  { to: '/ai-coach',       icon: Bot,             label: 'AI Coach',        tour: 'nav-ai-coach' },
+  { to: '/reports',        icon: BarChart3,       label: 'Reports',         tour: 'nav-reports' },
+  { to: '/settings',       icon: Settings,        label: 'Settings',        tour: 'nav-settings' },
 ]
 
 export default function Sidebar() {
   const { user, logout } = useAuth()
-  const navigate = useNavigate()
 
   return (
     <aside className="w-64 min-h-screen bg-surface-900 border-r border-surface-800 flex flex-col">
@@ -41,10 +41,11 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 p-4 space-y-1">
-        {nav.map(({ to, icon: Icon, label }) => (
+        {nav.map(({ to, icon: Icon, label, tour }) => (
           <NavLink
             key={to}
             to={to}
+            data-tour={tour}
             className={({ isActive }) =>
               clsx(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
@@ -59,6 +60,11 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Help menu */}
+      <div className="border-t border-surface-800 pt-2">
+        <HelpMenu />
+      </div>
 
       {/* User */}
       <div className="p-4 border-t border-surface-800">

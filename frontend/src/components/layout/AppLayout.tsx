@@ -1,5 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import OnboardingModal from '../onboarding/OnboardingModal'
+import GuidedTourOverlay from '../onboarding/GuidedTourOverlay'
 
 export default function AppLayout() {
   return (
@@ -8,6 +10,8 @@ export default function AppLayout() {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+      <OnboardingModal />
+      <GuidedTourOverlay />
     </div>
   )
 }

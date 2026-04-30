@@ -15,6 +15,8 @@ import AICoachPage from './pages/AICoachPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 
+import { OnboardingProvider } from './context/OnboardingContext'
+
 const queryClient = new QueryClient()
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -31,6 +33,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <OnboardingProvider>
         <Routes>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
@@ -49,6 +52,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </OnboardingProvider>
       </BrowserRouter>
     </QueryClientProvider>
   )
