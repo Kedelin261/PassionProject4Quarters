@@ -206,6 +206,8 @@ export default function GoalsPage() {
   const [newGoal, setNewGoal] = useState({ title: '', description: '', targetMetric: '', targetValue: 100 })
   const [newMonthly, setNewMonthly] = useState({ title: '', monthNumber: 1 })
   const [newCycle, setNewCycle] = useState({ title: '', startDate: new Date().toISOString().split('T')[0], endDate: '' })
+  const [cycleLoading, setCycleLoading] = useState(false)
+  const [cycleError, setCycleError] = useState<string | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -224,8 +226,22 @@ export default function GoalsPage() {
   }
 
   async function createCycle() {
-    await api.post('/cycles', newCycle)
-    setShowAddCycle(false); load()
+    setCycleLoading(true)
+    setCycleError(null)
+    try {
+      console.log('[CreateCycle] Sending payload:', newCycle)
+      const res = await api.post('/cycles', newCycle)
+      console.log('[CreateCycle] Success:', res.data)
+      setShowAddCycle(false)
+      setNewCycle({ title: '', startDate: new Date().toISOString().split('T')[0], endDate: '' })
+      await load()
+    } catch (err: any) {
+      console.error('[CreateCycle] Error:', err)
+      const msg = err?.response?.data?.error || err?.message || 'Failed to create cycle. Please try again.'
+      setCycleError(msg)
+    } finally {
+      setCycleLoading(false)
+    }
   }
 
   async function addMonthly(qgId: string) {
@@ -369,29 +385,59 @@ export default function GoalsPage() {
         </div>
       )}
 
-      <Modal open={showAddCycle} onClose={() => setShowAddCycle(false)} title="Create 12-Week Cycle">
+      <Modal
+        open={showAddCycle}
+        onClose={() => { setShowAddCycle(false); setCycleError(null) }}
+        title="Create 12-Week Cycle"
+      >
         <div className="space-y-4">
           <div>
-            <label className="block text-surface-300 text-sm mb-1">Cycle Title</label>
-            <input value={newCycle.title} onChange={e => setNewCycle({ ...newCycle, title: e.target.value })}
+            <label className="block text-surface-300 text-sm mb-1">Cycle Title *</label>
+            <input
+              value={newCycle.title}
+              onChange={e => setNewCycle({ ...newCycle, title: e.target.value })}
               className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500"
-              placeholder="Q1 2026 Execution Cycle" />
+              placeholder="Q2 2026 Execution Cycle"
+              autoFocus
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-surface-300 text-sm mb-1">Start Date</label>
-              <input type="date" value={newCycle.startDate} onChange={e => setNewCycle({ ...newCycle, startDate: e.target.value })}
-                className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" />
+              <label className="block text-surface-300 text-sm mb-1">Start Date *</label>
+              <input
+                type="date"
+                value={newCycle.startDate}
+                onChange={e => setNewCycle({ ...newCycle, startDate: e.target.value })}
+                className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500"
+              />
             </div>
             <div>
-              <label className="block text-surface-300 text-sm mb-1">End Date</label>
-              <input type="date" value={newCycle.endDate} onChange={e => setNewCycle({ ...newCycle, endDate: e.target.value })}
-                className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500" />
+              <label className="block text-surface-300 text-sm mb-1">End Date *</label>
+              <input
+                type="date"
+                value={newCycle.endDate}
+                onChange={e => setNewCycle({ ...newCycle, endDate: e.target.value })}
+                min={newCycle.startDate}
+                className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500"
+              />
             </div>
           </div>
+          {cycleError && (
+            <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+              {cycleError}
+            </div>
+          )}
           <div className="flex gap-3 justify-end pt-2">
-            <Button variant="secondary" onClick={() => setShowAddCycle(false)}>Cancel</Button>
-            <Button onClick={createCycle} disabled={!newCycle.title || !newCycle.endDate}>Create Cycle</Button>
+            <Button variant="secondary" onClick={() => { setShowAddCycle(false); setCycleError(null) }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={createCycle}
+              disabled={!newCycle.title.trim() || !newCycle.endDate}
+              loading={cycleLoading}
+            >
+              Create Cycle
+            </Button>
           </div>
         </div>
       </Modal>
