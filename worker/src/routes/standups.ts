@@ -13,7 +13,7 @@ standups.get('/', async (c) => {
   const params: any[] = [userId]
   if (type) { query += ' AND type = ?'; params.push(type) }
   query += ' ORDER BY date DESC, created_at DESC'
-  if (limit) query += ` LIMIT ${parseInt(limit)}`
+  if (limit) query += ` LIMIT ${Math.min(parseInt(limit) || 50, 100)}`
   const { results } = await c.env.DB.prepare(query).bind(...params).all()
   return c.json(results)
 })
@@ -21,6 +21,7 @@ standups.get('/', async (c) => {
 standups.post('/', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json()
+  if (!body.type || !body.date) return c.json({ error: 'type and date are required' }, 400)
   const id = uuid()
   await c.env.DB.prepare('INSERT INTO standups (id,user_id,partner_user_id,type,date,previous_progress,next_focus,blockers,reflection,score_summary,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
     .bind(id, userId, body.partnerUserId || null, body.type, body.date, body.previousProgress || '', body.nextFocus || '', body.blockers || '', body.reflection || '', body.scoreSummary || '', now(), now()).run()

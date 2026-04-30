@@ -1,7 +1,14 @@
 import { Context, Next } from 'hono'
 
+const ALLOWED_ORIGINS = [
+  'https://four-quarters.pages.dev',
+  'http://localhost:5173',
+  'http://localhost:4173',
+]
+
 export async function corsMiddleware(c: Context, next: Next) {
-  const origin = c.req.header('Origin') || '*'
+  const requestOrigin = c.req.header('Origin') || ''
+  const origin = ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0]
   c.header('Access-Control-Allow-Origin', origin)
   c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   c.header('Access-Control-Allow-Headers', 'Content-Type,Authorization')

@@ -15,6 +15,7 @@ habits.get('/', async (c) => {
 habits.post('/', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json()
+  if (!body.name) return c.json({ error: 'name is required' }, 400)
   if (body.weeklyGoalId) {
     const wg = await c.env.DB.prepare('SELECT id FROM weekly_goals WHERE id = ? AND user_id = ?').bind(body.weeklyGoalId, userId).first()
     if (!wg) return c.json({ error: 'Weekly goal not found' }, 404)
@@ -60,6 +61,7 @@ habits.get('/entries', async (c) => {
 habits.post('/entries', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json()
+  if (!body.habitId || !body.date) return c.json({ error: 'habitId and date are required' }, 400)
   const habit = await c.env.DB.prepare('SELECT * FROM habits WHERE id = ? AND user_id = ?').bind(body.habitId, userId).first() as any
   if (!habit) return c.json({ error: 'Habit not found' }, 404)
   const executed = body.executed ? 1 : 0

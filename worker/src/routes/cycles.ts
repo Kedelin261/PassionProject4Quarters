@@ -15,6 +15,7 @@ cycles.get('/', async (c) => {
 cycles.post('/', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json()
+  if (!body.title || !body.startDate || !body.endDate) return c.json({ error: 'title, startDate, and endDate are required' }, 400)
   const id = uuid()
   await c.env.DB.prepare('INSERT INTO twelve_week_cycles (id,user_id,title,start_date,end_date,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)')
     .bind(id, userId, body.title, body.startDate, body.endDate, body.status || 'active', now(), now()).run()

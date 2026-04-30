@@ -101,6 +101,7 @@ goals.delete('/quarter/:id', async (c) => {
 goals.post('/monthly', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json()
+  if (!body.title || !body.twelveWeekGoalId || body.monthNumber == null) return c.json({ error: 'title, twelveWeekGoalId, and monthNumber are required' }, 400)
   const parent = await c.env.DB.prepare('SELECT id FROM twelve_week_goals WHERE id = ? AND user_id = ?').bind(body.twelveWeekGoalId, userId).first()
   if (!parent) return c.json({ error: 'Parent goal not found' }, 404)
   const id = uuid()
@@ -132,6 +133,7 @@ goals.delete('/monthly/:id', async (c) => {
 goals.post('/weekly', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json()
+  if (!body.title || !body.monthlyGoalId || body.weekNumber == null) return c.json({ error: 'title, monthlyGoalId, and weekNumber are required' }, 400)
   const parent = await c.env.DB.prepare('SELECT id FROM monthly_goals WHERE id = ? AND user_id = ?').bind(body.monthlyGoalId, userId).first()
   if (!parent) return c.json({ error: 'Parent goal not found' }, 404)
   const id = uuid()
@@ -156,6 +158,8 @@ goals.delete('/weekly/:id', async (c) => {
   const { id } = c.req.param()
   const g = await c.env.DB.prepare('SELECT id FROM weekly_goals WHERE id = ? AND user_id = ?').bind(id, userId).first()
   if (!g) return c.json({ error: 'Not found' }, 404)
+  // Unlink habits before delete to avoid FK constraint (schema has no ON DELETE action)
+  await c.env.DB.prepare('UPDATE habits SET weekly_goal_id = NULL, updated_at = ? WHERE weekly_goal_id = ?').bind(now(), id).run()
   await c.env.DB.prepare('DELETE FROM weekly_goals WHERE id = ?').bind(id).run()
   return c.json({ message: 'Deleted' })
 })

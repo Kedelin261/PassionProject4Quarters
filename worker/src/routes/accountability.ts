@@ -22,6 +22,7 @@ accountability.get('/partners', async (c) => {
 accountability.post('/invite', async (c) => {
   const userId = c.get('userId')
   const { email } = await c.req.json()
+  if (!email) return c.json({ error: 'email is required' }, 400)
   const receiver = await c.env.DB.prepare('SELECT id, name, email FROM users WHERE email = ?').bind(email).first() as any
   if (!receiver) return c.json({ error: 'User not found' }, 404)
   if (receiver.id === userId) return c.json({ error: 'Cannot invite yourself' }, 400)

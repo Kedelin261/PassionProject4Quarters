@@ -9,6 +9,7 @@ const auth = new Hono<{ Bindings: Env; Variables: { userId: string } }>()
 auth.post('/register', async (c) => {
   const { name, email, password } = await c.req.json()
   if (!name || !email || !password) return c.json({ error: 'Missing fields' }, 400)
+  if (password.length < 8) return c.json({ error: 'Password must be at least 8 characters' }, 400)
   const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first()
   if (existing) return c.json({ error: 'Email already registered' }, 409)
   const passwordHash = await bcrypt.hash(password, 10)

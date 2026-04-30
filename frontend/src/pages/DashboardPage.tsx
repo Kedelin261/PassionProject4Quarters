@@ -15,7 +15,7 @@ export default function DashboardPage() {
   const [weeklyScore, setWeeklyScore] = useState<any>(null)
   const [goals, setGoals] = useState<any[]>([])
   const [todayBlocks, setTodayBlocks] = useState<any[]>([])
-  const [todayGoals, setTodayGoals] = useState<any[]>([])
+  const [todayHabits, setTodayHabits] = useState<any[]>([])
   const [cycle, setCycle] = useState<any>(null)
   const today = new Date().toISOString().split('T')[0]
 
@@ -29,22 +29,20 @@ export default function DashboardPage() {
     ]).then(([daily, weekly, goalTree, blocks, cycles]) => {
       setDailyScore(daily.data)
       setWeeklyScore(weekly.data)
-      setGoals(goalTree.data)
+      const treeData = goalTree.data
+      setGoals(treeData?.twelveWeekGoals || [])
+      setCycle(treeData?.cycle || cycles.data.find((c: any) => c.status === 'active') || null)
       setTodayBlocks(blocks.data)
-      const activeCycle = cycles.data.find((c: any) => c.status === 'active')
-      setCycle(activeCycle || null)
-      // Flatten daily goals for today
-      const allDaily: any[] = []
-      goalTree.data.forEach((qg: any) => {
-        qg.monthlyGoals?.forEach((mg: any) => {
+      // Flatten habits from the goal tree (they already include today's entry data)
+      const allHabits: any[] = []
+      treeData?.twelveWeekGoals?.forEach((twg: any) => {
+        twg.monthlyGoals?.forEach((mg: any) => {
           mg.weeklyGoals?.forEach((wg: any) => {
-            wg.dailyGoals?.forEach((dg: any) => {
-              if (dg.date === today) allDaily.push(dg)
-            })
+            wg.habits?.forEach((h: any) => allHabits.push(h))
           })
         })
       })
-      setTodayGoals(allDaily)
+      setTodayHabits(allHabits)
     })
   }, [today])
 
@@ -144,28 +142,31 @@ export default function DashboardPage() {
           )}
         </Card>
 
-        {/* Today's Goals */}
+        {/* Today's Habits */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Today's Goals ({todayGoals.filter((g: any) => g.status === 'completed').length}/{todayGoals.length})</CardTitle>
-              <Button size="sm" variant="ghost" onClick={() => navigate('/goals')}>
-                <CheckSquare size={14} /> Manage
+              <CardTitle>Today's Habits ({todayHabits.filter((h: any) => h.successToday).length}/{todayHabits.length})</CardTitle>
+              <Button size="sm" variant="ghost" onClick={() => navigate('/habits')}>
+                <CheckSquare size={14} /> Track
               </Button>
             </div>
           </CardHeader>
-          {todayGoals.length === 0 ? (
+          {todayHabits.length === 0 ? (
             <div className="text-center py-6 text-surface-500">
               <CheckSquare size={32} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm">No daily goals set</p>
+              <p className="text-sm">No habits linked to goals yet</p>
+              <Button size="sm" className="mt-3" onClick={() => navigate('/habits')}>Add Habits</Button>
             </div>
           ) : (
             <div className="space-y-2">
-              {todayGoals.slice(0, 6).map((g: any) => (
-                <div key={g.id} className="flex items-center gap-3">
-                  <div className={`w-4 h-4 rounded border-2 flex-shrink-0 ${g.status === 'completed' ? 'bg-emerald-500 border-emerald-500' : 'border-surface-600'}`} />
-                  <span className={`text-sm ${g.status === 'completed' ? 'text-surface-500 line-through' : 'text-surface-300'}`}>{g.title}</span>
-                  <Badge status={g.status} />
+              {todayHabits.slice(0, 6).map((h: any) => (
+                <div key={h.id} className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full flex-shrink-0 ${h.successToday ? 'bg-emerald-500' : h.entryId ? 'bg-red-500/60' : 'bg-surface-700'}`} />
+                  <span className={`text-sm flex-1 ${h.successToday ? 'text-surface-400 line-through' : 'text-surface-300'}`}>{h.name}</span>
+                  <span className={`text-xs font-medium ${h.successToday ? 'text-emerald-400' : h.entryId ? 'text-red-400' : 'text-surface-600'}`}>
+                    {h.successToday ? '✓' : h.entryId ? '✗' : '—'}
+                  </span>
                 </div>
               ))}
             </div>

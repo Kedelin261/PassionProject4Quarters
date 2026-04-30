@@ -20,7 +20,12 @@ function HabitRow({ habit, onUpdate }: { habit: HabitWithEntry; onUpdate: () => 
   async function toggle() {
     setLoading(true)
     try {
-      await api.post('/habits/entries', { habitId: habit.id, date: today, executed: !habit.successToday })
+      // When undoing success, flip the executed state.
+      // When initially marking success, use the goal direction: execute=true, avoid=false.
+      const executed = isSuccess
+        ? !habit.executedToday
+        : habit.goal_behavior === 'execute'
+      await api.post('/habits/entries', { habitId: habit.id, date: today, executed })
       onUpdate()
     } finally {
       setLoading(false)
