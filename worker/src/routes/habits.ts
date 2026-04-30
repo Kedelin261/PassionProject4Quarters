@@ -15,9 +15,13 @@ habits.get('/', async (c) => {
 habits.post('/', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json()
+  if (body.weeklyGoalId) {
+    const wg = await c.env.DB.prepare('SELECT id FROM weekly_goals WHERE id = ? AND user_id = ?').bind(body.weeklyGoalId, userId).first()
+    if (!wg) return c.json({ error: 'Weekly goal not found' }, 404)
+  }
   const id = uuid()
-  await c.env.DB.prepare('INSERT INTO habits (id,user_id,name,habit_type,goal_behavior,active,created_at,updated_at) VALUES (?,?,?,?,?,1,?,?)')
-    .bind(id, userId, body.name, body.habitType || 'positive', body.goalBehavior || 'execute', now(), now()).run()
+  await c.env.DB.prepare('INSERT INTO habits (id,user_id,name,habit_type,goal_behavior,active,weekly_goal_id,created_at,updated_at) VALUES (?,?,?,?,?,1,?,?,?)')
+    .bind(id, userId, body.name, body.habitType || 'positive', body.goalBehavior || 'execute', body.weeklyGoalId || null, now(), now()).run()
   return c.json(await c.env.DB.prepare('SELECT * FROM habits WHERE id = ?').bind(id).first(), 201)
 })
 
@@ -27,8 +31,8 @@ habits.put('/:id', async (c) => {
   const body = await c.req.json()
   const h = await c.env.DB.prepare('SELECT id FROM habits WHERE id = ? AND user_id = ?').bind(id, userId).first()
   if (!h) return c.json({ error: 'Not found' }, 404)
-  await c.env.DB.prepare('UPDATE habits SET name=?,habit_type=?,goal_behavior=?,active=?,updated_at=? WHERE id=?')
-    .bind(body.name, body.habitType, body.goalBehavior, body.active ? 1 : 0, now(), id).run()
+  await c.env.DB.prepare('UPDATE habits SET name=?,habit_type=?,goal_behavior=?,active=?,weekly_goal_id=?,updated_at=? WHERE id=?')
+    .bind(body.name, body.habitType, body.goalBehavior, body.active ? 1 : 0, body.weeklyGoalId ?? null, now(), id).run()
   return c.json(await c.env.DB.prepare('SELECT * FROM habits WHERE id = ?').bind(id).first())
 })
 

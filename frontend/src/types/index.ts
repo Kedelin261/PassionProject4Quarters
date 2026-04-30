@@ -49,6 +49,19 @@ export interface MonthlyGoal {
   weeklyGoals?: WeeklyGoal[]
 }
 
+export interface HabitWithEntry {
+  id: string
+  user_id: string
+  name: string
+  habit_type: 'positive' | 'negative'
+  goal_behavior: 'execute' | 'avoid'
+  active: number
+  weekly_goal_id: string | null
+  executedToday: boolean
+  successToday: boolean
+  entryId: string | null
+}
+
 export interface WeeklyGoal {
   id: string
   monthly_goal_id: string
@@ -56,6 +69,8 @@ export interface WeeklyGoal {
   description: string
   week_number: number
   status: 'not_started' | 'in_progress' | 'blocked' | 'completed'
+  habits?: HabitWithEntry[]
+  habitProgress?: number
   dailyGoals?: DailyGoal[]
 }
 
@@ -145,9 +160,9 @@ export interface AIConversation {
 
 export interface PyramidMetrics {
   cycleProgress: number
+  twelveWeekProgress: number
   monthlyProgress: number
   weeklyProgress: number
-  dailyProgress: number
   habitProgress: number
 }
 
@@ -156,6 +171,7 @@ export interface PyramidHabit {
   name: string
   goal_behavior: 'execute' | 'avoid'
   habit_type: string
+  weekly_goal_id: string | null
   entry_id: string | null
   executed: number | null
   success: number | null
@@ -164,10 +180,9 @@ export interface PyramidHabit {
 
 export interface PyramidData {
   cycle: (Cycle & { progress: number }) | null
-  quarterGoals: (QuarterGoal & { progress: number })[]
+  twelveWeekGoals: (QuarterGoal & { progress: number })[]
   monthlyGoals: MonthlyGoal[]
   weeklyGoals: WeeklyGoal[]
-  dailyGoals: DailyGoal[]
   habits: PyramidHabit[]
   metrics: PyramidMetrics
 }

@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS habits (
   habit_type TEXT DEFAULT 'positive',
   goal_behavior TEXT DEFAULT 'execute',
   active INTEGER DEFAULT 1,
+  weekly_goal_id TEXT REFERENCES weekly_goals(id),
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

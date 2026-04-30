@@ -64,12 +64,12 @@ export default function PyramidView() {
     )
   }
 
-  const { cycle, quarterGoals, monthlyGoals, weeklyGoals, dailyGoals, habits, metrics } = data
+  const { cycle, twelveWeekGoals, monthlyGoals, weeklyGoals, habits, metrics } = data
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
   return (
     <div className="flex gap-6 items-start">
-      {/* Pyramid */}
+      {/* Pyramid — narrowest (habits) at top, widest (cycle) at bottom */}
       <div className="flex-1 flex flex-col items-center min-w-0">
         <div className="text-surface-500 text-xs uppercase tracking-widest mb-6 font-medium">
           Execution Pyramid — {today}
@@ -77,41 +77,28 @@ export default function PyramidView() {
 
         <PyramidLayer
           widthPct={30}
-          label="12-Week Cycle"
-          sublabel={`${cycle.start_date} → ${cycle.end_date}`}
-          progress={metrics.cycleProgress}
-          color={progressColor(metrics.cycleProgress, quarterGoals.length > 0)}
-          items={quarterGoals.map(g => ({
-            ...g,
-            _label: g.title,
-            _sub: `${g.progress}% of target`,
+          label="Habits"
+          sublabel="Today's execution"
+          progress={metrics.habitProgress}
+          color={progressColor(metrics.habitProgress, habits.length > 0)}
+          items={habits.map(h => ({
+            ...h,
+            _label: h.name,
+            _sub: h.success === 1
+              ? 'success'
+              : h.entry_id != null
+                ? 'failed'
+                : 'not logged',
           }))}
-          type="quarter"
-          onItemClick={item => setSelected({ item, type: 'quarter' })}
+          type="habit"
+          onItemClick={item => setSelected({ item, type: 'habit' })}
+          emptyText="No habits linked to goals — create habits in the Habits tab and link them to a weekly goal"
         />
 
         <Connector />
 
         <PyramidLayer
-          widthPct={50}
-          label="Monthly Goals"
-          sublabel="Current month"
-          progress={metrics.monthlyProgress}
-          color={progressColor(metrics.monthlyProgress, monthlyGoals.length > 0)}
-          items={monthlyGoals.map(g => ({
-            ...g,
-            _label: g.title,
-            _sub: g.status.replace(/_/g, ' '),
-          }))}
-          type="monthly"
-          onItemClick={item => setSelected({ item, type: 'monthly' })}
-          emptyText="No monthly goals for current month — add them in List View"
-        />
-
-        <Connector />
-
-        <PyramidLayer
-          widthPct={68}
+          widthPct={48}
           label="Weekly Goals"
           sublabel="Linked to current month's goals"
           progress={metrics.weeklyProgress}
@@ -129,41 +116,53 @@ export default function PyramidView() {
         <Connector />
 
         <PyramidLayer
-          widthPct={84}
-          label="Daily Goals"
-          sublabel="Today"
-          progress={metrics.dailyProgress}
-          color={progressColor(metrics.dailyProgress, dailyGoals.length > 0)}
-          items={dailyGoals.map(g => ({
+          widthPct={65}
+          label="Monthly Goals"
+          sublabel="Current month"
+          progress={metrics.monthlyProgress}
+          color={progressColor(metrics.monthlyProgress, monthlyGoals.length > 0)}
+          items={monthlyGoals.map(g => ({
             ...g,
             _label: g.title,
             _sub: g.status.replace(/_/g, ' '),
           }))}
-          type="daily"
-          onItemClick={item => setSelected({ item, type: 'daily' })}
-          emptyText="No daily goals for today — add them in List View"
+          type="monthly"
+          onItemClick={item => setSelected({ item, type: 'monthly' })}
+          emptyText="No monthly goals for current month — add them in List View"
+        />
+
+        <Connector />
+
+        <PyramidLayer
+          widthPct={82}
+          label="12-Week Goals"
+          sublabel="This cycle"
+          progress={metrics.twelveWeekProgress}
+          color={progressColor(metrics.twelveWeekProgress, twelveWeekGoals.length > 0)}
+          items={twelveWeekGoals.map(g => ({
+            ...g,
+            _label: g.title,
+            _sub: `${g.progress}% of target`,
+          }))}
+          type="quarter"
+          onItemClick={item => setSelected({ item, type: 'quarter' })}
         />
 
         <Connector />
 
         <PyramidLayer
           widthPct={100}
-          label="Habits"
-          sublabel="Today's tracking"
-          progress={metrics.habitProgress}
-          color={progressColor(metrics.habitProgress, habits.length > 0)}
-          items={habits.map(h => ({
-            ...h,
-            _label: h.name,
-            _sub: h.success === 1
-              ? 'success'
-              : h.entry_id != null
-                ? 'failed'
-                : 'not logged',
-          }))}
-          type="habit"
-          onItemClick={item => setSelected({ item, type: 'habit' })}
-          emptyText="No habits tracked — create habits in the Habits tab"
+          label="12-Week Cycle"
+          sublabel={`${cycle.start_date} → ${cycle.end_date}`}
+          progress={metrics.cycleProgress}
+          color={progressColor(metrics.cycleProgress, twelveWeekGoals.length > 0)}
+          items={[{
+            ...cycle,
+            _label: cycle.title,
+            _sub: `${metrics.cycleProgress}% complete`,
+          }]}
+          type="cycle"
+          onItemClick={() => {}}
         />
 
         {/* Legend */}

@@ -7,37 +7,57 @@ import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import PyramidView from '../components/goals/PyramidView'
-import type { QuarterGoal, MonthlyGoal, WeeklyGoal, DailyGoal, Cycle } from '../types'
+import type { QuarterGoal, MonthlyGoal, WeeklyGoal, HabitWithEntry, Cycle } from '../types'
 
 type ViewMode = 'list' | 'pyramid'
 
 const STATUS_OPTIONS = ['not_started', 'in_progress', 'blocked', 'completed']
-const DAILY_STATUS = ['planned', 'completed', 'missed', 'blocked']
 
-function DailyGoalRow({ goal, onUpdate, onDelete }: { goal: DailyGoal; onUpdate: () => void; onDelete: () => void }) {
-  async function setStatus(status: string) {
-    await api.put(`/goals/daily/${goal.id}`, { ...goal, status })
+function HabitRow({ habit, onUpdate }: { habit: HabitWithEntry; onUpdate: () => void }) {
+  const today = new Date().toISOString().split('T')[0]
+  const [loading, setLoading] = useState(false)
+
+  async function toggle() {
+    setLoading(true)
+    try {
+      await api.post('/habits/entries', { habitId: habit.id, date: today, executed: !habit.successToday })
+      onUpdate()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function deleteHabit() {
+    await api.delete(`/habits/${habit.id}`)
     onUpdate()
   }
+
+  const isSuccess = habit.successToday
+  const hasEntry = habit.entryId != null
+
   return (
-    <div className="flex items-center gap-3 pl-16 py-2 group">
+    <div className="flex items-center gap-2 pl-20 py-2 group">
+      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isSuccess ? 'bg-emerald-500' : hasEntry ? 'bg-red-500' : 'bg-surface-600'}`} />
+      <span className="flex-1 text-sm text-surface-400">{habit.name}</span>
+      <span className="text-xs text-surface-600 capitalize">{habit.goal_behavior}</span>
+      {isSuccess
+        ? <span className="text-emerald-400 text-xs font-medium">✓ Done</span>
+        : hasEntry
+          ? <span className="text-red-400 text-xs">✗ Skipped</span>
+          : <span className="text-surface-600 text-xs">Not logged</span>
+      }
       <button
-        onClick={() => setStatus(goal.status === 'completed' ? 'planned' : 'completed')}
-        className={`w-4 h-4 rounded border-2 flex-shrink-0 transition-all ${goal.status === 'completed' ? 'bg-emerald-500 border-emerald-500' : 'border-surface-600 hover:border-brand-500'}`}
-      />
-      <span className={`flex-1 text-sm ${goal.status === 'completed' ? 'line-through text-surface-500' : 'text-surface-300'}`}>
-        {goal.title}
-      </span>
-      <span className="text-surface-600 text-xs">{goal.date}</span>
-      <Badge status={goal.status} />
-      <select
-        value={goal.status}
-        onChange={(e) => setStatus(e.target.value)}
-        className="opacity-0 group-hover:opacity-100 bg-surface-800 border border-surface-700 text-xs text-white rounded px-1 py-0.5 transition-opacity"
+        onClick={toggle}
+        disabled={loading}
+        className={`text-xs px-2 py-1 rounded border transition-all ${
+          isSuccess
+            ? 'border-emerald-600/40 bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20'
+            : 'border-surface-700 text-surface-400 hover:text-white hover:border-surface-600'
+        }`}
       >
-        {DAILY_STATUS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-      </select>
-      <button onClick={onDelete} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-all">
+        {isSuccess ? 'Undo' : habit.goal_behavior === 'execute' ? 'Done' : 'Avoided'}
+      </button>
+      <button onClick={deleteHabit} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-all">
         <Trash2 size={14} />
       </button>
     </div>
@@ -46,21 +66,18 @@ function DailyGoalRow({ goal, onUpdate, onDelete }: { goal: DailyGoal; onUpdate:
 
 function WeeklyGoalRow({ goal, onUpdate }: { goal: WeeklyGoal; onUpdate: () => void }) {
   const [expanded, setExpanded] = useState(false)
-  const [showAddDaily, setShowAddDaily] = useState(false)
-  const [newDailyTitle, setNewDailyTitle] = useState('')
-  const [newDailyDate, setNewDailyDate] = useState(new Date().toISOString().split('T')[0])
+  const [showAddHabit, setShowAddHabit] = useState(false)
+  const [habitName, setHabitName] = useState('')
+  const [goalBehavior, setGoalBehavior] = useState<'execute' | 'avoid'>('execute')
 
-  async function addDaily() {
-    if (!newDailyTitle.trim()) return
-    await api.post('/goals/daily', { weeklyGoalId: goal.id, title: newDailyTitle, date: newDailyDate })
-    setNewDailyTitle(''); setShowAddDaily(false); onUpdate()
-  }
-  async function deleteDaily(id: string) {
-    await api.delete(`/goals/daily/${id}`); onUpdate()
+  async function addHabit() {
+    if (!habitName.trim()) return
+    await api.post('/habits', { name: habitName, goalBehavior, habitType: 'positive', weeklyGoalId: goal.id })
+    setHabitName(''); setGoalBehavior('execute'); setShowAddHabit(false); onUpdate()
   }
 
-  const completed = goal.dailyGoals?.filter(d => d.status === 'completed').length || 0
-  const total = goal.dailyGoals?.length || 0
+  const habits = goal.habits || []
+  const successCount = habits.filter(h => h.successToday).length
 
   return (
     <div>
@@ -69,10 +86,12 @@ function WeeklyGoalRow({ goal, onUpdate }: { goal: WeeklyGoal; onUpdate: () => v
         <div className="w-3 h-3 rounded-full border-2 border-yellow-500 flex-shrink-0" />
         <span className="flex-1 text-sm text-surface-200">{goal.title}</span>
         <span className="text-surface-500 text-xs">Week {goal.week_number}</span>
-        {total > 0 && <span className="text-xs text-surface-500">{completed}/{total}</span>}
+        {habits.length > 0 && (
+          <span className="text-xs text-surface-500">{successCount}/{habits.length} habits</span>
+        )}
         <Badge status={goal.status} />
         <button
-          onClick={(e) => { e.stopPropagation(); setShowAddDaily(!showAddDaily) }}
+          onClick={(e) => { e.stopPropagation(); setShowAddHabit(!showAddHabit) }}
           className="opacity-0 group-hover:opacity-100 text-brand-400 hover:text-brand-300 transition-all"
         >
           <Plus size={14} />
@@ -85,24 +104,42 @@ function WeeklyGoalRow({ goal, onUpdate }: { goal: WeeklyGoal; onUpdate: () => v
         </button>
       </div>
 
-      {showAddDaily && (
+      {showAddHabit && (
         <div className="pl-16 py-2 flex gap-2">
-          <input value={newDailyTitle} onChange={e => setNewDailyTitle(e.target.value)} placeholder="Daily goal title"
-            className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-brand-500" />
-          <input type="date" value={newDailyDate} onChange={e => setNewDailyDate(e.target.value)}
-            className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-brand-500" />
-          <Button size="sm" onClick={addDaily}>Add</Button>
+          <input
+            value={habitName}
+            onChange={e => setHabitName(e.target.value)}
+            placeholder="Habit name"
+            onKeyDown={e => e.key === 'Enter' && addHabit()}
+            className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-brand-500"
+          />
+          <select
+            value={goalBehavior}
+            onChange={e => setGoalBehavior(e.target.value as 'execute' | 'avoid')}
+            className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-brand-500"
+          >
+            <option value="execute">Execute</option>
+            <option value="avoid">Avoid</option>
+          </select>
+          <Button size="sm" onClick={addHabit}>Add</Button>
         </div>
       )}
 
-      {expanded && goal.dailyGoals?.map(dg => (
-        <DailyGoalRow key={dg.id} goal={dg} onUpdate={onUpdate} onDelete={() => deleteDaily(dg.id)} />
+      {expanded && habits.map(h => (
+        <HabitRow key={h.id} habit={h} onUpdate={onUpdate} />
       ))}
+
+      {expanded && habits.length === 0 && (
+        <div className="pl-20 py-2 text-surface-600 text-xs">
+          No habits linked.{' '}
+          <button className="text-brand-400 hover:underline" onClick={() => setShowAddHabit(true)}>Add one</button>
+        </div>
+      )}
     </div>
   )
 }
 
-function MonthlyGoalRow({ goal, cycleId, onUpdate }: { goal: MonthlyGoal; cycleId: string; onUpdate: () => void }) {
+function MonthlyGoalRow({ goal, onUpdate }: { goal: MonthlyGoal; onUpdate: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const [showAddWeekly, setShowAddWeekly] = useState(false)
   const [weeklyTitle, setWeeklyTitle] = useState('')
@@ -131,6 +168,7 @@ function MonthlyGoalRow({ goal, cycleId, onUpdate }: { goal: MonthlyGoal; cycleI
       {showAddWeekly && (
         <div className="pl-8 py-2 flex gap-2">
           <input value={weeklyTitle} onChange={e => setWeeklyTitle(e.target.value)} placeholder="Weekly goal title"
+            onKeyDown={e => e.key === 'Enter' && addWeekly()}
             className="flex-1 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-brand-500" />
           <input type="number" value={weekNum} onChange={e => setWeekNum(+e.target.value)} min={1} max={12}
             className="w-20 bg-surface-800 border border-surface-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-brand-500" />
@@ -141,6 +179,13 @@ function MonthlyGoalRow({ goal, cycleId, onUpdate }: { goal: MonthlyGoal; cycleI
       {expanded && goal.weeklyGoals?.map(wg => (
         <WeeklyGoalRow key={wg.id} goal={wg} onUpdate={onUpdate} />
       ))}
+
+      {expanded && (goal.weeklyGoals?.length ?? 0) === 0 && (
+        <div className="pl-8 py-2 text-surface-600 text-xs">
+          No weekly goals.{' '}
+          <button className="text-brand-400 hover:underline" onClick={() => setShowAddWeekly(true)}>Add one</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -148,7 +193,6 @@ function MonthlyGoalRow({ goal, cycleId, onUpdate }: { goal: MonthlyGoal; cycleI
 export default function GoalsPage() {
   const [view, setView] = useState<ViewMode>('list')
   const [goals, setGoals] = useState<QuarterGoal[]>([])
-  const [cycles, setCycles] = useState<Cycle[]>([])
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [showAddGoal, setShowAddGoal] = useState(false)
@@ -158,16 +202,13 @@ export default function GoalsPage() {
   const [newMonthly, setNewMonthly] = useState({ title: '', monthNumber: 1 })
   const [newCycle, setNewCycle] = useState({ title: '', startDate: new Date().toISOString().split('T')[0], endDate: '' })
 
-  useEffect(() => {
-    load()
-  }, [])
+  useEffect(() => { load() }, [])
 
   async function load() {
-    const [g, c] = await Promise.all([api.get('/goals/tree'), api.get('/cycles')])
-    setGoals(g.data)
-    setCycles(c.data)
-    const active = c.data.find((x: Cycle) => x.status === 'active')
-    setActiveCycle(active || null)
+    const g = await api.get('/goals/tree')
+    const treeData = g.data
+    setGoals(treeData?.twelveWeekGoals || [])
+    setActiveCycle(treeData?.cycle || null)
   }
 
   async function createGoal() {
@@ -192,17 +233,14 @@ export default function GoalsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Goals</h1>
-          <p className="text-surface-400 text-sm">12-week vision broken into executable daily actions</p>
+          <p className="text-surface-400 text-sm">12-week vision broken into executable weekly habits</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* View toggle */}
           <div className="flex items-center bg-surface-800 border border-surface-700 rounded-lg p-1">
             <button
               onClick={() => setView('list')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                view === 'list'
-                  ? 'bg-brand-600 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white'
+                view === 'list' ? 'bg-brand-600 text-white shadow-sm' : 'text-surface-400 hover:text-white'
               }`}
             >
               <LayoutList size={13} /> List
@@ -210,9 +248,7 @@ export default function GoalsPage() {
             <button
               onClick={() => setView('pyramid')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                view === 'pyramid'
-                  ? 'bg-brand-600 text-white shadow-sm'
-                  : 'text-surface-400 hover:text-white'
+                view === 'pyramid' ? 'bg-brand-600 text-white shadow-sm' : 'text-surface-400 hover:text-white'
               }`}
             >
               <Triangle size={13} /> Pyramid
@@ -260,10 +296,8 @@ export default function GoalsPage() {
         </Card>
       )}
 
-      {/* Pyramid View */}
       {view === 'pyramid' && <PyramidView />}
 
-      {/* List View */}
       {view === 'list' && goals.length === 0 && (
         <Card className="text-center py-12">
           <Target size={48} className="mx-auto mb-4 text-surface-600" />
@@ -314,13 +348,14 @@ export default function GoalsPage() {
 
               {expanded[qg.id] && (
                 <div className="mt-4 border-t border-surface-800 pt-4">
-                  {qg.monthlyGoals?.length === 0 && (
+                  {(qg.monthlyGoals?.length ?? 0) === 0 && (
                     <div className="text-center py-4 text-surface-500 text-sm">
-                      No monthly goals. <button className="text-brand-400 hover:underline" onClick={() => setShowAddMonthly(qg.id)}>Add one</button>
+                      No monthly goals.{' '}
+                      <button className="text-brand-400 hover:underline" onClick={() => setShowAddMonthly(qg.id)}>Add one</button>
                     </div>
                   )}
                   {qg.monthlyGoals?.map(mg => (
-                    <MonthlyGoalRow key={mg.id} goal={mg} cycleId={qg.cycle_id} onUpdate={load} />
+                    <MonthlyGoalRow key={mg.id} goal={mg} onUpdate={load} />
                   ))}
                 </div>
               )}
@@ -329,7 +364,6 @@ export default function GoalsPage() {
         </div>
       )}
 
-      {/* Add Cycle Modal */}
       <Modal open={showAddCycle} onClose={() => setShowAddCycle(false)} title="Create 12-Week Cycle">
         <div className="space-y-4">
           <div>
@@ -357,7 +391,6 @@ export default function GoalsPage() {
         </div>
       </Modal>
 
-      {/* Add Quarter Goal Modal */}
       <Modal open={showAddGoal} onClose={() => setShowAddGoal(false)} title="Add 12-Week Goal">
         <div className="space-y-4">
           <div>
@@ -392,7 +425,6 @@ export default function GoalsPage() {
         </div>
       </Modal>
 
-      {/* Add Monthly Goal Modal */}
       <Modal open={!!showAddMonthly} onClose={() => setShowAddMonthly(null)} title="Add Monthly Goal">
         <div className="space-y-4">
           <div>

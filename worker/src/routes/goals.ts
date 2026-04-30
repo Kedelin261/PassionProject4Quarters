@@ -8,27 +8,63 @@ goals.use('*', authMiddleware)
 
 goals.get('/tree', async (c) => {
   const userId = c.get('userId')
-  const [qg, mg, wg, dg] = await Promise.all([
-    c.env.DB.prepare('SELECT * FROM twelve_week_goals WHERE user_id = ? ORDER BY priority, created_at').bind(userId).all(),
+  const today = new Date().toISOString().split('T')[0]
+
+  const cycle = await c.env.DB.prepare(
+    "SELECT * FROM twelve_week_cycles WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1"
+  ).bind(userId).first() as any
+
+  if (!cycle) return c.json(null)
+
+  const [twgRes, mgRes, wgRes, habitsRes, entriesRes] = await Promise.all([
+    c.env.DB.prepare('SELECT * FROM twelve_week_goals WHERE user_id = ? AND cycle_id = ? ORDER BY priority, created_at').bind(userId, cycle.id).all(),
     c.env.DB.prepare('SELECT * FROM monthly_goals WHERE user_id = ? ORDER BY month_number, created_at').bind(userId).all(),
     c.env.DB.prepare('SELECT * FROM weekly_goals WHERE user_id = ? ORDER BY week_number, created_at').bind(userId).all(),
-    c.env.DB.prepare('SELECT * FROM daily_goals WHERE user_id = ? ORDER BY date, created_at').bind(userId).all(),
+    c.env.DB.prepare('SELECT * FROM habits WHERE user_id = ? AND active = 1 ORDER BY created_at').bind(userId).all(),
+    c.env.DB.prepare('SELECT * FROM habit_entries WHERE user_id = ? AND date = ?').bind(userId, today).all(),
   ])
-  const quarterGoals = qg.results as any[]
-  const monthlyGoals = mg.results as any[]
-  const weeklyGoals = wg.results as any[]
-  const dailyGoals = dg.results as any[]
-  const tree = quarterGoals.map((q: any) => ({
-    ...q,
-    monthlyGoals: monthlyGoals.filter((m: any) => m.twelve_week_goal_id === q.id).map((m: any) => ({
-      ...m,
-      weeklyGoals: weeklyGoals.filter((w: any) => w.monthly_goal_id === m.id).map((w: any) => ({
-        ...w,
-        dailyGoals: dailyGoals.filter((d: any) => d.weekly_goal_id === w.id)
-      }))
-    }))
-  }))
-  return c.json(tree)
+
+  const twelveWeekGoals = twgRes.results as any[]
+  const allMonthlyGoals = mgRes.results as any[]
+  const allWeeklyGoals = wgRes.results as any[]
+  const allHabits = habitsRes.results as any[]
+  const todayEntries = entriesRes.results as any[]
+
+  const entryMap = new Map(todayEntries.map((e: any) => [e.habit_id, e]))
+  const twgIds = new Set(twelveWeekGoals.map((g: any) => g.id))
+  const monthlyGoals = allMonthlyGoals.filter((m: any) => twgIds.has(m.twelve_week_goal_id))
+  const mgIds = new Set(monthlyGoals.map((g: any) => g.id))
+  const weeklyGoals = allWeeklyGoals.filter((w: any) => mgIds.has(w.monthly_goal_id))
+  const wgIds = new Set(weeklyGoals.map((g: any) => g.id))
+  const linkedHabits = allHabits.filter((h: any) => h.weekly_goal_id && wgIds.has(h.weekly_goal_id))
+
+  const pct = (num: number, den: number) => den > 0 ? Math.round((num / den) * 100) : 0
+
+  const enrichHabit = (h: any) => {
+    const entry = entryMap.get(h.id) as any
+    return {
+      ...h,
+      executedToday: entry ? entry.executed === 1 : false,
+      successToday: entry ? entry.success === 1 : false,
+      entryId: entry?.id || null,
+    }
+  }
+
+  const tree = twelveWeekGoals.map((twg: any) => {
+    const twgMonthly = monthlyGoals.filter((m: any) => m.twelve_week_goal_id === twg.id).map((m: any) => {
+      const mWeekly = weeklyGoals.filter((w: any) => w.monthly_goal_id === m.id).map((w: any) => {
+        const wHabits = linkedHabits.filter((h: any) => h.weekly_goal_id === w.id).map(enrichHabit)
+        const successCount = wHabits.filter((h: any) => h.successToday).length
+        return { ...w, habits: wHabits, habitProgress: pct(successCount, wHabits.length) }
+      })
+      const completedWeekly = mWeekly.filter((w: any) => w.status === 'completed').length
+      return { ...m, weeklyGoals: mWeekly, weeklyProgress: pct(completedWeekly, mWeekly.length) }
+    })
+    const completedMonthly = twgMonthly.filter((m: any) => m.status === 'completed').length
+    return { ...twg, monthlyGoals: twgMonthly, monthlyProgress: pct(completedMonthly, twgMonthly.length) }
+  })
+
+  return c.json({ cycle, twelveWeekGoals: tree })
 })
 
 goals.post('/quarter', async (c) => {
@@ -166,8 +202,8 @@ goals.get('/pyramid', async (c) => {
 
   if (!cycle) {
     return c.json({
-      cycle: null, quarterGoals: [], monthlyGoals: [], weeklyGoals: [], dailyGoals: [], habits: [],
-      metrics: { cycleProgress: 0, monthlyProgress: 0, weeklyProgress: 0, dailyProgress: 0, habitProgress: 0 },
+      cycle: null, twelveWeekGoals: [], monthlyGoals: [], weeklyGoals: [], habits: [],
+      metrics: { cycleProgress: 0, twelveWeekProgress: 0, monthlyProgress: 0, weeklyProgress: 0, habitProgress: 0 },
     })
   }
 
@@ -175,44 +211,44 @@ goals.get('/pyramid', async (c) => {
   const monthsElapsed = (nowDate.getFullYear() - cycleStart.getFullYear()) * 12 + (nowDate.getMonth() - cycleStart.getMonth())
   const currentMonthNumber = Math.min(Math.max(monthsElapsed + 1, 1), 3)
 
-  const [qgRes, mgRes, wgRes, dgRes, habitsRes] = await Promise.all([
+  const [twgRes, mgRes, wgRes, habitsRes, entriesRes] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM twelve_week_goals WHERE user_id = ? AND cycle_id = ? ORDER BY priority').bind(userId, cycle.id).all(),
     c.env.DB.prepare('SELECT * FROM monthly_goals WHERE user_id = ? AND month_number = ? ORDER BY created_at').bind(userId, currentMonthNumber).all(),
     c.env.DB.prepare('SELECT * FROM weekly_goals WHERE user_id = ? ORDER BY week_number, created_at').bind(userId).all(),
-    c.env.DB.prepare('SELECT * FROM daily_goals WHERE user_id = ? AND date = ? ORDER BY created_at').bind(userId, today).all(),
-    c.env.DB.prepare(
-      'SELECT h.id, h.name, h.goal_behavior, h.habit_type, he.id as entry_id, he.executed, he.success, he.note ' +
-      'FROM habits h LEFT JOIN habit_entries he ON h.id = he.habit_id AND he.date = ? ' +
-      'WHERE h.user_id = ? AND h.active = 1 ORDER BY h.created_at'
-    ).bind(today, userId).all(),
+    c.env.DB.prepare('SELECT * FROM habits WHERE user_id = ? AND active = 1 ORDER BY created_at').bind(userId).all(),
+    c.env.DB.prepare('SELECT * FROM habit_entries WHERE user_id = ? AND date = ?').bind(userId, today).all(),
   ])
 
-  const quarterGoals = qgRes.results as any[]
-  const qgIds = new Set(quarterGoals.map((g: any) => g.id))
-  const monthlyGoals = (mgRes.results as any[]).filter((mg: any) => qgIds.has(mg.twelve_week_goal_id))
+  const twelveWeekGoals = twgRes.results as any[]
+  const twgIds = new Set(twelveWeekGoals.map((g: any) => g.id))
+  const monthlyGoals = (mgRes.results as any[]).filter((m: any) => twgIds.has(m.twelve_week_goal_id))
   const mgIds = new Set(monthlyGoals.map((g: any) => g.id))
-  const weeklyGoals = (wgRes.results as any[]).filter((wg: any) => mgIds.has(wg.monthly_goal_id))
-  const dailyGoals = dgRes.results as any[]
-  const habits = habitsRes.results as any[]
+  const allWeeklyGoals = wgRes.results as any[]
+  const weeklyGoals = allWeeklyGoals.filter((w: any) => mgIds.has(w.monthly_goal_id))
+  const wgIds = new Set(weeklyGoals.map((g: any) => g.id))
+  const allHabits = habitsRes.results as any[]
+  const linkedHabits = allHabits.filter((h: any) => h.weekly_goal_id && wgIds.has(h.weekly_goal_id))
+  const todayEntries = entriesRes.results as any[]
+  const entryMap = new Map(todayEntries.map((e: any) => [e.habit_id, e]))
+
+  const habits = linkedHabits.map((h: any) => {
+    const entry = entryMap.get(h.id) as any
+    return { ...h, entry_id: entry?.id || null, executed: entry?.executed ?? null, success: entry?.success ?? null }
+  })
 
   const pct = (num: number, den: number) => den > 0 ? Math.round((num / den) * 100) : 0
-  const cycleProgress = pct(quarterGoals.filter((g: any) => g.status === 'completed').length, quarterGoals.length)
-  const monthlyProgress = pct(monthlyGoals.filter((g: any) => g.status === 'completed').length, monthlyGoals.length)
-  const weeklyProgress = pct(weeklyGoals.filter((g: any) => g.status === 'completed').length, weeklyGoals.length)
-  const dailyProgress = pct(dailyGoals.filter((g: any) => g.status === 'completed').length, dailyGoals.length)
   const habitProgress = pct(habits.filter((h: any) => h.success === 1).length, habits.length)
+  const weeklyProgress = pct(weeklyGoals.filter((g: any) => g.status === 'completed').length, weeklyGoals.length)
+  const monthlyProgress = pct(monthlyGoals.filter((g: any) => g.status === 'completed').length, monthlyGoals.length)
+  const twelveWeekProgress = pct(twelveWeekGoals.filter((g: any) => g.status === 'completed').length, twelveWeekGoals.length)
 
   return c.json({
-    cycle: { ...cycle, progress: cycleProgress },
-    quarterGoals: quarterGoals.map((g: any) => ({
-      ...g,
-      progress: pct(g.current_value, g.target_value || 100),
-    })),
+    cycle: { ...cycle, progress: twelveWeekProgress },
+    twelveWeekGoals: twelveWeekGoals.map((g: any) => ({ ...g, progress: pct(g.current_value, g.target_value || 100) })),
     monthlyGoals,
     weeklyGoals,
-    dailyGoals,
     habits,
-    metrics: { cycleProgress, monthlyProgress, weeklyProgress, dailyProgress, habitProgress },
+    metrics: { cycleProgress: twelveWeekProgress, twelveWeekProgress, monthlyProgress, weeklyProgress, habitProgress },
   })
 })
 
