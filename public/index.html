@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4 Quarters — Execute Your Vision</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="/static/app.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { DEFAULT: '#4F46E5', dark: '#3730A3', light: '#818CF8' },
+            accent:  { DEFAULT: '#F59E0B', dark: '#D97706' },
+            success: { DEFAULT: '#10B981' },
+            danger:  { DEFAULT: '#EF4444' },
+            dark:    { DEFAULT: '#0F0F1A', card: '#1A1A2E', border: '#2D2D4E' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-dark text-white min-h-screen font-sans">
+
+<!-- App Shell -->
+<div id="app">
+  <!-- Loading Screen -->
+  <div id="loading-screen" class="fixed inset-0 bg-dark flex items-center justify-center z-50">
+    <div class="text-center">
+      <div class="text-5xl font-black tracking-tight text-white mb-2">
+        <span class="text-primary">4</span> QUARTERS
+      </div>
+      <div class="text-dark-border text-sm tracking-widest uppercase">Execute Your Vision</div>
+      <div class="mt-6 flex justify-center gap-1">
+        <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay:0s"></div>
+        <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay:0.15s"></div>
+        <div class="w-2 h-2 bg-primary rounded-full animate-bounce" style="animation-delay:0.3s"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Screen -->
+  <div id="auth-screen" class="hidden fixed inset-0 bg-dark flex items-center justify-center z-40">
+    <div class="w-full max-w-md px-6">
+      <div class="text-center mb-8">
+        <div class="text-4xl font-black tracking-tight text-white">
+          <span class="text-primary">4</span> QUARTERS
+        </div>
+        <p class="text-gray-400 text-sm mt-2 italic">"Plans don't fail because it is a bad plan, plans fail when execution lacks."</p>
+      </div>
+
+      <div class="bg-dark-card rounded-2xl p-8 border border-dark-border">
+        <!-- Tabs -->
+        <div class="flex mb-6 bg-dark rounded-xl p-1">
+          <button id="tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all bg-primary text-white">Sign In</button>
+          <button id="tab-register" onclick="switchAuthTab('register')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all text-gray-400">Sign Up</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" onsubmit="handleLogin(event)">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Email</label>
+              <input id="login-email" type="email" required placeholder="you@example.com"
+                class="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Password</label>
+              <input id="login-password" type="password" required placeholder="••••••••"
+                class="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition">
+            </div>
+            <div id="login-error" class="text-danger text-sm hidden"></div>
+            <button type="submit" id="login-btn"
+              class="w-full bg-primary hover:bg-primary-dark py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2">
+              <i class="fas fa-sign-in-alt"></i> Sign In
+            </button>
+          </div>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Full Name</label>
+              <input id="reg-name" type="text" required placeholder="Your name"
+                class="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Email</label>
+              <input id="reg-email" type="email" required placeholder="you@example.com"
+                class="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Password (min 6 chars)</label>
+              <input id="reg-password" type="password" required placeholder="••••••••" minlength="6"
+                class="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition">
+            </div>
+            <div id="reg-error" class="text-danger text-sm hidden"></div>
+            <button type="submit" id="reg-btn"
+              class="w-full bg-primary hover:bg-primary-dark py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2">
+              <i class="fas fa-rocket"></i> Start Your Journey
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App (post-auth) -->
+  <div id="main-app" class="hidden flex h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-dark-card border-r border-dark-border flex flex-col fixed h-full z-30 transition-transform">
+      <div class="p-5 border-b border-dark-border">
+        <div class="text-xl font-black tracking-tight">
+          <span class="text-primary">4</span> QUARTERS
+        </div>
+        <div id="user-name-display" class="text-xs text-gray-400 mt-1"></div>
+      </div>
+
+      <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+        <a href="#" onclick="navigate('dashboard')" data-page="dashboard" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-home w-4 text-center"></i> Dashboard
+        </a>
+        <a href="#" onclick="navigate('cycle')" data-page="cycle" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-circle-notch w-4 text-center"></i> 12-Week Cycle
+        </a>
+        <a href="#" onclick="navigate('goals')" data-page="goals" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-bullseye w-4 text-center"></i> Goals
+        </a>
+        <a href="#" onclick="navigate('pyramid')" data-page="pyramid" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-layer-group w-4 text-center"></i> Pyramid View
+        </a>
+        <a href="#" onclick="navigate('habits')" data-page="habits" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-check-double w-4 text-center"></i> Habit Tracker
+        </a>
+        <a href="#" onclick="navigate('calendar')" data-page="calendar" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-calendar-alt w-4 text-center"></i> Time Blocking
+        </a>
+        <a href="#" onclick="navigate('scores')" data-page="scores" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-chart-bar w-4 text-center"></i> Scores
+        </a>
+        <a href="#" onclick="navigate('accountability')" data-page="accountability" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-users w-4 text-center"></i> Accountability
+        </a>
+        <a href="#" onclick="navigate('standup')" data-page="standup" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-clipboard-list w-4 text-center"></i> Standup
+        </a>
+        <a href="#" onclick="navigate('ai')" data-page="ai" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition">
+          <i class="fas fa-brain w-4 text-center"></i> AI Coach
+        </a>
+      </nav>
+
+      <div class="p-3 border-t border-dark-border space-y-1">
+        <button onclick="showOnboarding()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-dark transition">
+          <i class="fas fa-question-circle w-4"></i> Help / Getting Started
+        </button>
+        <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-danger hover:bg-dark transition">
+          <i class="fas fa-sign-out-alt w-4"></i> Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 ml-64 overflow-y-auto bg-dark">
+      <!-- Top bar -->
+      <header class="sticky top-0 z-20 bg-dark border-b border-dark-border px-6 py-4 flex items-center justify-between">
+        <div id="page-title" class="text-lg font-bold">Dashboard</div>
+        <div class="flex items-center gap-3">
+          <div id="today-score-badge" class="hidden text-xs bg-dark-card border border-dark-border rounded-lg px-3 py-1"></div>
+          <div id="header-user" class="text-xs text-gray-400"></div>
+        </div>
+      </header>
+
+      <!-- Pages -->
+      <div class="p-6">
+        <!-- DASHBOARD -->
+        <section id="page-dashboard" class="page-section">
+          <div id="dashboard-content"></div>
+        </section>
+
+        <!-- 12-WEEK CYCLE -->
+        <section id="page-cycle" class="page-section hidden">
+          <div id="cycle-content"></div>
+        </section>
+
+        <!-- GOALS -->
+        <section id="page-goals" class="page-section hidden">
+          <div id="goals-content"></div>
+        </section>
+
+        <!-- PYRAMID VIEW -->
+        <section id="page-pyramid" class="page-section hidden">
+          <div id="pyramid-content"></div>
+        </section>
+
+        <!-- HABITS -->
+        <section id="page-habits" class="page-section hidden">
+          <div id="habits-content"></div>
+        </section>
+
+        <!-- CALENDAR / TIME BLOCKING -->
+        <section id="page-calendar" class="page-section hidden">
+          <div id="calendar-content"></div>
+        </section>
+
+        <!-- SCORES -->
+        <section id="page-scores" class="page-section hidden">
+          <div id="scores-content"></div>
+        </section>
+
+        <!-- ACCOUNTABILITY -->
+        <section id="page-accountability" class="page-section hidden">
+          <div id="accountability-content"></div>
+        </section>
+
+        <!-- STANDUP -->
+        <section id="page-standup" class="page-section hidden">
+          <div id="standup-content"></div>
+        </section>
+
+        <!-- AI COACH -->
+        <section id="page-ai" class="page-section hidden">
+          <div id="ai-content"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ONBOARDING MODAL -->
+  <div id="onboarding-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+    <div class="bg-dark-card border border-dark-border rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div id="onboarding-inner"></div>
+    </div>
+  </div>
+
+  <!-- GENERIC MODAL -->
+  <div id="modal-overlay" class="hidden fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
+    <div id="modal-box" class="bg-dark-card border border-dark-border rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
