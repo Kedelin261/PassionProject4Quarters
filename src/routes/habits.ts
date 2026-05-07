@@ -21,7 +21,7 @@ habits.post('/', async (c) => {
       user.id,
       title,
       type || 'execute',
-      target_days || '1,2,3,4,5,6,7'
+      JSON.stringify(Array.isArray(target_days) ? target_days : (target_days ? String(target_days).split(',').map(Number) : [1,2,3,4,5,6,7]))
     ).run()
 
     const habit = await c.env.DB.prepare('SELECT * FROM habits WHERE id = ?').bind(result.meta.last_row_id).first()

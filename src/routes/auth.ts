@@ -96,7 +96,15 @@ auth.patch('/onboarding', async (c) => {
   const token = extractToken(c)
   const user = await getAuthUser(c.env.DB, token)
   if (!user) return c.json({ error: 'Unauthorized' }, 401)
-  
+  await c.env.DB.prepare('UPDATE users SET onboarding_completed = 1 WHERE id = ?').bind(user.id).run()
+  return c.json({ success: true })
+})
+
+// POST /api/auth/onboarding/complete  (alias)
+auth.post('/onboarding/complete', async (c) => {
+  const token = extractToken(c)
+  const user = await getAuthUser(c.env.DB, token)
+  if (!user) return c.json({ error: 'Unauthorized' }, 401)
   await c.env.DB.prepare('UPDATE users SET onboarding_completed = 1 WHERE id = ?').bind(user.id).run()
   return c.json({ success: true })
 })

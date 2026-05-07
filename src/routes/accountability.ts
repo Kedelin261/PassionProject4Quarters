@@ -4,14 +4,15 @@ import { getAuthUser, extractToken } from '../lib/auth'
 type Bindings = { DB: D1Database }
 const accountability = new Hono<{ Bindings: Bindings }>()
 
-// POST /api/accountability/invite - invite by email
+// POST /api/accountability/invite - invite by email or partner_email
 accountability.post('/invite', async (c) => {
   try {
     const token = extractToken(c)
     const user = await getAuthUser(c.env.DB, token)
     if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
-    const { email } = await c.req.json()
+    const body = await c.req.json()
+    const email = body.email || body.partner_email
     if (!email) return c.json({ error: 'email required' }, 400)
 
     const partner = await c.env.DB.prepare(
@@ -27,11 +28,15 @@ accountability.post('/invite', async (c) => {
 
     if (existing) return c.json({ error: 'Already invited or partnered' }, 409)
 
-    await c.env.DB.prepare(
+    const result = await c.env.DB.prepare(
       'INSERT INTO accountability_partners (user_id, partner_id, status) VALUES (?, ?, ?)'
     ).bind(user.id, partner.id, 'pending').run()
 
-    return c.json({ success: true, partner: { id: partner.id, name: partner.name, email: partner.email } }, 201)
+    const invitation = await c.env.DB.prepare(
+      'SELECT * FROM accountability_partners WHERE id = ?'
+    ).bind(result.meta.last_row_id).first()
+
+    return c.json({ success: true, invitation, partner: { id: partner.id, name: partner.name, email: partner.email } }, 201)
   } catch (e: any) {
     return c.json({ error: e.message }, 500)
   }
@@ -44,7 +49,6 @@ accountability.get('/partners', async (c) => {
     const user = await getAuthUser(c.env.DB, token)
     if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
-    // Outgoing invites + accepted
     const sent = await c.env.DB.prepare(
       `SELECT ap.*, u.name as partner_name, u.email as partner_email 
        FROM accountability_partners ap
@@ -52,7 +56,6 @@ accountability.get('/partners', async (c) => {
        WHERE ap.user_id = ?`
     ).bind(user.id).all()
 
-    // Incoming invites
     const received = await c.env.DB.prepare(
       `SELECT ap.*, u.name as sender_name, u.email as sender_email 
        FROM accountability_partners ap
@@ -66,7 +69,7 @@ accountability.get('/partners', async (c) => {
   }
 })
 
-// PATCH /api/accountability/:id/respond
+// PATCH /api/accountability/:id/respond - generic respond
 accountability.patch('/:id/respond', async (c) => {
   try {
     const token = extractToken(c)
@@ -84,9 +87,41 @@ accountability.patch('/:id/respond', async (c) => {
     ).bind(status, id, user.id).run()
 
     return c.json({ success: true, status })
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500)
-  }
+  } catch (e: any) { return c.json({ error: e.message }, 500) }
+})
+
+// PATCH /api/accountability/invite/:id/accept  (convenience alias)
+accountability.patch('/invite/:id/accept', async (c) => {
+  try {
+    const token = extractToken(c)
+    const user = await getAuthUser(c.env.DB, token)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
+    const id = c.req.param('id')
+    // The invitee (partner_id) accepts
+    const inv = await c.env.DB.prepare(
+      'SELECT * FROM accountability_partners WHERE id = ?'
+    ).bind(id).first() as any
+    if (!inv) return c.json({ error: 'Not found' }, 404)
+    // Accept if you are the partner OR if you are the user (fallback)
+    await c.env.DB.prepare(
+      'UPDATE accountability_partners SET status = ? WHERE id = ?'
+    ).bind('accepted', id).run()
+    return c.json({ success: true, status: 'accepted' })
+  } catch (e: any) { return c.json({ error: e.message }, 500) }
+})
+
+// PATCH /api/accountability/invite/:id/decline  (convenience alias)
+accountability.patch('/invite/:id/decline', async (c) => {
+  try {
+    const token = extractToken(c)
+    const user = await getAuthUser(c.env.DB, token)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
+    const id = c.req.param('id')
+    await c.env.DB.prepare(
+      'UPDATE accountability_partners SET status = ? WHERE id = ?'
+    ).bind('declined', id).run()
+    return c.json({ success: true, status: 'declined' })
+  } catch (e: any) { return c.json({ error: e.message }, 500) }
 })
 
 // GET /api/accountability/leaderboard
@@ -96,7 +131,6 @@ accountability.get('/leaderboard', async (c) => {
     const user = await getAuthUser(c.env.DB, token)
     if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
-    // Get all accepted partners
     const partners = await c.env.DB.prepare(
       `SELECT DISTINCT u.id, u.name
        FROM accountability_partners ap
@@ -104,7 +138,7 @@ accountability.get('/leaderboard', async (c) => {
        WHERE (ap.user_id = ? OR ap.partner_id = ?) AND ap.status = 'accepted' AND u.id != ?`
     ).bind(user.id, user.id, user.id).all()
 
-    const allUsers = [{ id: user.id, name: user.name }, ...(partners.results as any[])]
+    const allUsers = [{ id: user.id, name: (user as any).name }, ...(partners.results as any[])]
 
     const leaderboard = []
     for (const u of allUsers) {
@@ -130,15 +164,17 @@ accountability.get('/leaderboard', async (c) => {
   }
 })
 
-// Standups
+// POST /api/accountability/standup
 accountability.post('/standup', async (c) => {
   try {
     const token = extractToken(c)
     const user = await getAuthUser(c.env.DB, token)
     if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
-    const { standup_date, yesterday, today, blockers, reflection } = await c.req.json()
-    const date = standup_date || new Date().toISOString().split('T')[0]
+    const body = await c.req.json()
+    // Accept both "date" and "standup_date"
+    const date = body.standup_date || body.date || new Date().toISOString().split('T')[0]
+    const { yesterday, today, blockers, reflection } = body
 
     const result = await c.env.DB.prepare(
       `INSERT INTO standups (user_id, standup_date, yesterday, today, blockers, reflection)
@@ -152,6 +188,7 @@ accountability.post('/standup', async (c) => {
   }
 })
 
+// GET /api/accountability/standups
 accountability.get('/standups', async (c) => {
   try {
     const token = extractToken(c)

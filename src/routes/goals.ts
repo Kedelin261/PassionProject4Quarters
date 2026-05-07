@@ -125,7 +125,11 @@ goals.post('/monthly', async (c) => {
     const user = await getAuthUser(c.env.DB, token)
     if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
-    const { quarter_goal_id, title, description, month_number } = await c.req.json()
+    const body = await c.req.json()
+    const quarter_goal_id = body.quarter_goal_id
+    const title = body.title
+    const description = body.description
+    const month_number = body.month_number || body.month
     if (!quarter_goal_id || !title || !month_number) {
       return c.json({ error: 'quarter_goal_id, title, month_number required' }, 400)
     }
@@ -176,7 +180,11 @@ goals.post('/weekly', async (c) => {
     const user = await getAuthUser(c.env.DB, token)
     if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
-    const { monthly_goal_id, title, description, week_number } = await c.req.json()
+    const body2 = await c.req.json()
+    const monthly_goal_id = body2.monthly_goal_id
+    const title = body2.title
+    const description = body2.description
+    const week_number = body2.week_number || body2.week
     if (!monthly_goal_id || !title || !week_number) {
       return c.json({ error: 'monthly_goal_id, title, week_number required' }, 400)
     }

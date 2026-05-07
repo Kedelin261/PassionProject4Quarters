@@ -36,7 +36,14 @@ export async function calculateDailyScore(db: D1Database, userId: number, date: 
   let habitDone = 0
   
   for (const h of habits as any[]) {
-    const targetDays = (h.target_days || '1,2,3,4,5,6,7').split(',').map(Number)
+    let targetDays: number[]
+    if (Array.isArray(h.target_days)) {
+      targetDays = h.target_days.map(Number)
+    } else if (typeof h.target_days === 'string') {
+      try { targetDays = JSON.parse(h.target_days) } catch { targetDays = h.target_days.split(',').map(Number) }
+    } else {
+      targetDays = [1,2,3,4,5,6,7]
+    }
     if (!targetDays.includes(dayOfWeek)) continue
     habitTotal++
     if (h.type === 'execute' && h.completed) habitDone++
